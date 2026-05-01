@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>“拍鸟识鸟”：一种轻量级地区鸟类识别系统设计与实现</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-width: 240px;
+            --primary-color: #3498db;
+            --accent-color: #27ae60;
+            --bg-light: #f8fafc;
+            --text-dark: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-light);
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+            color: var(--text-dark);
+        }
+
+        /* --- 左侧导航栏 --- */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.25rem;
+            margin: 0;
+            color: var(--primary-color);
+            letter-spacing: 1px;
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #64748b;
+            font-weight: 500;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-item i {
+            margin-right: 12px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .nav-item:hover {
+            background: #f1f5f9;
+            color: var(--primary-color);
+        }
+
+        .nav-item.active {
+            background: #eff6ff;
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        /* --- 右侧内容区 --- */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 40px;
+            max-width: 1000px;
+        }
+
+        .page-module {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .page-module.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 25px;
+        }
+
+        /* --- 恢复虚线框风格 & 移除固定高度 --- */
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            width: 95%;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fbfcfe;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: #f0f7ff;
+        }
+
+        .upload-placeholder {
+            text-align: center;
+            color: #64748b;
+        }
+
+        /* --- 照片等比例平铺样式 --- */
+        #imagePreview {
+            max-width: 100%;
+            height: auto;
+            display: none;
+            margin-top: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .input-box {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary { background: var(--primary-color); color: white; width: 100%; justify-content: center; }
+        .btn-green { background: var(--accent-color); color: white; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .gallery-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #f1f5f9;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gallery-card img { width: 100%; height: 160px; object-fit: cover; cursor: pointer; }
+        .gallery-card-info { padding: 12px; flex: 1; display: flex; flex-direction: column; }
+        .gallery-card-info strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--primary-color);
+            transition: color 0.2s;
+        }
+        .gallery-card-info strong:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+        .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+        .card-actions {
+            margin-top: auto;
+            padding-top: 12px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            display: block;
+            width: auto; /* 宽度自适应 */
+            height: auto; /* 高度自适应 */
+            max-width: 90%; /* 留点边距 */
+            max-height: 85vh; /* 留点空间给按钮 */
+            object-fit: contain;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            cursor: grab;
+        }
+
+        .modal-content.draggable {
+            cursor: grabbing;
+        }
+
+        .modal-content, #caption {
+            animation-name: zoom;
+            animation-duration: 0.6s;
+        }
+
+        @keyframes zoom {
+            from {transform:scale(0)}
+            to {transform:scale(1)}
+        }
+
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            z-index: 1002;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 30px; /* 固定在距离底部 30px 处 */
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 1001;
+        }
+
+        .zoom-btn {
+            background-color: rgba(255, 255, 255, 0.85);
+            border: none;
+            border-radius: 50%;
+            width: 45px; /* Slightly larger buttons */
+            height: 45px;
+            font-size: 24px; /* Larger icon */
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        .zoom-btn:hover {
+            background-color: rgba(255, 255, 255, 1);
+            transform: scale(1.05);
+        }
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Bird Details Section */
+        .bird-details-section {
+            margin-top: 25px;
+            text-align: left;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        .bird-details-section h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        .bird-details-section p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+        .bird-details-section p strong {
+            color: var(--text-dark);
+            margin-right: 5px;
+        }
+        .bird-details-section a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .bird-details-section a:hover {
+            text-decoration: underline;
+        }
+
+        /* Details Modal Styles */
+        .details-modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .details-modal-content {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease-out;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .details-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        /* --- 分页按钮样式 --- */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+        .page-btn {
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-dark);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .page-btn:hover:not(:disabled) {
+            background-color: var(--bg-light);
+            border-color: #cbd5e1;
+        }
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .page-info {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .details-close:hover {
+            color: #1e293b;
+        }
+
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; }
+            .main-content { margin-left: 0; padding: 20px; }
+            .modal-content {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h1>拍鸟识鸟</h1>
+    </div>
+    <div class="nav-menu">
+        <div class="nav-item active" onclick="switchTab('predict', this)">
+            <i class="fas fa-camera"></i> 拍照识鸟
+        </div>
+        <div class="nav-item" onclick="switchTab('community', this)">
+            <i class="fas fa-globe"></i> 拍友鸟迹
+        </div>
+        <!-- 新增菜单项 -->
+        <div class="nav-item" onclick="switchTab('encyclopedia', this)">
+            <i class="fas fa-book"></i> 鸟类百科
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div id="page-predict" class="page-module active">
+        <div class="card">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-placeholder" id="placeholderContent">
+                    <i class="fas fa-cloud-upload-alt fa-3x" style="color: #94a3b8;"></i>
+                    <p style="margin-top:15px;">点击此处拍照或选择本地鸟类图片</p>
+                </div>
+                <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                <img id="imagePreview" alt="Image Preview">
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="locationInput" class="input-box" placeholder="正在获取定位...">
+                <button class="btn btn-green" onclick="autoLocate()">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+            </div>
+
+            <button id="uploadBtn" class="btn btn-primary" disabled onclick="handleUpload()">
+                <i class="fas fa-magnifying-glass"></i> 开始识别
+            </button>
+        </div>
+
+        <div id="resultArea" class="card" style="display: none; text-align: center; border-top: 4px solid var(--accent-color);">
+            <h2 style="margin-top: 0; font-size: 1rem; color: #64748b;">识别结果</h2>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--accent-color);" id="birdName">-</div>
+            <div style="color: #94a3b8; margin-bottom: 20px;">
+                <span id="birdAccuracy">精确率: -%</span>
+            </div>
+
+            <hr style="border: 0; border-top: 1px dashed #e2e8f0; margin: 25px 0;">
+
+            <!-- Bird Details Section -->
+            <div id="birdDetailsSection" class="bird-details-section" style="display: none;">
+                <h4><i class="fas fa-info-circle"></i> 鸟类详情</h4>
+                <p><strong>描述:</strong> <span id="detailDescription">暂无</span></p>
+                <p><strong>栖息地:</strong> <span id="detailHabitat">暂无</span></p>
+                <p><strong>食性:</strong> <span id="detailDiet">暂无</span></p>
+                <p id="detailWikiLinkP" style="display: none;">
+                    <strong>更多信息:</strong> <a id="detailWikiLink" href="#" target="_blank">维基百科</a>
+                </p>
+            </div>
+            <!-- End Bird Details Section -->
+
+            <h3 style="font-size: 1rem; text-align: left; margin-top: 25px;"><i class="fas fa-images"></i> 其他拍友在这些地方也发现了它</h3>
+            <div class="gallery" id="sameBirdGallery"></div>
+        </div>
+
+        <div id="myHistoryArea" style="display: none;">
+            <h3 style="margin-top: 30px;"><i class="fas fa-clock-rotate-left"></i> 历史记录</h3>
+            <div class="gallery" id="myHistoryList"></div>
+        </div>
+    </div>
+
+    <div id="page-community" class="page-module">
+        <div class="card">
+            <div class="input-group">
+                <input type="text" id="searchInput" class="input-box" placeholder="搜索你感兴趣的鸟类 (如：白头海雕)">
+                <button class="btn btn-primary" style="width: auto;" onclick="searchHistory()">
+                    <i class="fas fa-search"></i> 搜索
+                </button>
+            </div>
+        </div>
+        <div class="gallery" id="historyList"></div>
+        <div id="paginationControls" class="pagination" style="display: none;">
+            <button id="prevPageBtn" class="page-btn" onclick="changePage(-1)">上一页</button>
+            <span id="pageInfo" class="page-info">第 1 / 1 页</span>
+            <button id="nextPageBtn" class="page-btn" onclick="changePage(1)">下一页</button>
+        </div>
+    </div>
+
+    <!-- 新增页面：鸟类百科 -->
+    <div id="page-encyclopedia" class="page-module">
+        <div class="card">
+            <div class="input-group">
+                <input type="text" id="encyclopediaSearchInput" class="input-box" placeholder="输入要查询的鸟类名称 (支持模糊搜索)...">
+                <button class="btn btn-primary" style="width: auto;" onclick="searchEncyclopedia()">
+                    <i class="fas fa-search"></i> 查询
+                </button>
+            </div>
+        </div>
+
+        <div id="encyclopediaResultArea" class="card" style="display: none;">
+            <h2 id="encyclopediaBirdName" style="color: var(--primary-color); margin-top: 0;">-</h2>
+            <div class="bird-details-section" style="margin-top: 15px; border: none; padding: 0; background: transparent;">
+                <p><strong>描述:</strong> <span id="encyclopediaDetailDescription">暂无</span></p>
+                <p><strong>栖息地:</strong> <span id="encyclopediaDetailHabitat">暂无</span></p>
+                <p><strong>食性:</strong> <span id="encyclopediaDetailDiet">暂无</span></p>
+                <p id="encyclopediaDetailWikiLinkP" style="display: none;">
+                    <strong>更多信息:</strong> <a id="encyclopediaDetailWikiLink" href="#" target="_blank">维基百科</a>
+                </p>
+            </div>
+        </div>
+
+        <div id="encyclopediaErrorArea" class="card" style="display: none; text-align: center; color: #64748b;">
+            <i class="fas fa-kiwi-bird fa-3x" style="margin-bottom: 15px; color: #cbd5e1;"></i>
+            <p>未找到相关的鸟类详细信息。请尝试更换搜索关键词。</p>
+        </div>
+    </div>
+</div>
+
+<!-- Image Enlarge Modal -->
+<div id="myModal" class="modal" style="display:none;">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <img class="modal-content" id="img01" alt="Enlarged bird image">
+    <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomOut()">-</button>
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div id="detailsModal" class="details-modal" style="display: none;">
+    <div class="details-modal-content">
+        <span class="details-close" onclick="closeDetailsModal()">&times;</span>
+        <h2 id="modalBirdName" style="color: var(--primary-color); margin-top: 0;">-</h2>
+        <div class="bird-details-section" style="margin-top: 15px; border: none; padding: 0; background: transparent;">
+            <p><strong>描述:</strong> <span id="modalDetailDescription">暂无</span></p>
+            <p><strong>栖息地:</strong> <span id="modalDetailHabitat">暂无</span></p>
+            <p><strong>食性:</strong> <span id="modalDetailDiet">暂无</span></p>
+            <p id="modalDetailWikiLinkP" style="display: none;">
+                <strong>更多信息:</strong> <a id="modalDetailWikiLink" href="#" target="_blank">维基百科</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    window._AMapSecurityConfig = { securityJsCode: 'fe3a264e44b445090473a9997295df1d' }
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=49dd07a6b0ab8a4fe2e292da90826b43"></script>
+
+<script>
+    const API_URL = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : window.location.origin;
+    
+    let currentHistoryPage = 1;
+    let totalHistoryPages = 1;
+
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        el.classList.add('active');
+        document.querySelectorAll('.page-module').forEach(page => page.classList.remove('active'));
+        document.getElementById('page-' + tabId).classList.add('active');
+
+        if(tabId === 'community') {
+            currentHistoryPage = 1; // 切换到社区时重置到第一页
+            fetchHistory();
+        } else if (tabId === 'encyclopedia') {
+            // 切换到百科页面时重置状态
+            document.getElementById('encyclopediaSearchInput').value = '';
+            document.getElementById('encyclopediaResultArea').style.display = 'none';
+            document.getElementById('encyclopediaErrorArea').style.display = 'none';
+        }
+    }
+
+    const fileInput = document.getElementById('fileInput');
+    const imagePreview = document.getElementById('imagePreview');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const placeholderContent = document.getElementById('placeholderContent');
+
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                placeholderContent.style.display = 'none';
+            }
+            reader.readAsDataURL(file);
+            uploadBtn.disabled = false;
+        }
+    });
+
+    async function handleUpload() {
+        const file = fileInput.files[0];
+        const loc = document.getElementById('locationInput').value.trim();
+        if (!loc) return alert("请输入拍摄地点");
+
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在识别...';
+        uploadBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('location', loc);
+
+        try {
+            const res = await fetch(`${API_URL}/predict`, { method: 'POST', body: formData });
+            const data = await res.json();
+            document.getElementById('resultArea').style.display = 'block';
+            document.getElementById('birdName').textContent = data.bird_name;
+            // 将 similarity 的值显示为精确率
+            document.getElementById('birdAccuracy').textContent = `精确率: ${data.similarity}%`;
+
+            // Fetch and display bird details for the main result area
+            await updateBirdDetailsSection(data.bird_name);
+
+            fetchSameBirds(data.bird_name);
+            saveToMyHistory(data);
+        } catch (error) {
+            alert('连接后端失败或识别失败: ' + error.message);
+        } finally {
+            uploadBtn.innerHTML = '<i class="fas fa-magnifying-glass"></i> 开始识别';
+            uploadBtn.disabled = false;
+        }
+    }
+
+    async function fetchBirdDetailsData(birdName) {
+        try {
+            const res = await fetch(`${API_URL}/bird_details/${encodeURIComponent(birdName)}`);
+            if (res.ok) {
+                return await res.json();
+            }
+            return null;
+        } catch (error) {
+            console.error("获取鸟类详情失败:", error);
+            return null;
+        }
+    }
+
+    async function updateBirdDetailsSection(birdName) {
+        const section = document.getElementById('birdDetailsSection');
+        const details = await fetchBirdDetailsData(birdName);
+
+        if (details) {
+            document.getElementById('detailDescription').textContent = details.description || '暂无';
+            document.getElementById('detailHabitat').textContent = details.habitat || '暂无';
+            document.getElementById('detailDiet').textContent = details.diet || '暂无';
+
+            const wikiLinkP = document.getElementById('detailWikiLinkP');
+            if (details.wiki_url) {
+                document.getElementById('detailWikiLink').href = details.wiki_url;
+                wikiLinkP.style.display = 'block';
+            } else {
+                wikiLinkP.style.display = 'none';
+            }
+            section.style.display = 'block';
+        } else {
+            section.style.display = 'none';
+        }
+    }
+
+    // 百科页面搜索功能
+    async function searchEncyclopedia() {
+        const query = document.getElementById('encyclopediaSearchInput').value.trim();
+        if (!query) return;
+
+        const resultArea = document.getElementById('encyclopediaResultArea');
+        const errorArea = document.getElementById('encyclopediaErrorArea');
+
+        resultArea.style.display = 'none';
+        errorArea.style.display = 'none';
+
+        try {
+             // 直接通过新的 /bird_details 接口进行查询（后端已支持模糊搜索）
+             const details = await fetchBirdDetailsData(query);
+
+             if (details) {
+                // 使用后端返回的完整名称
+                document.getElementById('encyclopediaBirdName').textContent = details.full_name || query;
+                document.getElementById('encyclopediaDetailDescription').textContent = details.description || '暂无';
+                document.getElementById('encyclopediaDetailHabitat').textContent = details.habitat || '暂无';
+                document.getElementById('encyclopediaDetailDiet').textContent = details.diet || '暂无';
+
+                const wikiLinkP = document.getElementById('encyclopediaDetailWikiLinkP');
+                if (details.wiki_url) {
+                    document.getElementById('encyclopediaDetailWikiLink').href = details.wiki_url;
+                    wikiLinkP.style.display = 'block';
+                } else {
+                    wikiLinkP.style.display = 'none';
+                }
+                resultArea.style.display = 'block';
+             } else {
+                errorArea.style.display = 'block';
+             }
+        } catch (error) {
+             console.error("搜索百科失败:", error);
+             errorArea.style.display = 'block';
+        }
+    }
+
+    // 监听回车键进行搜索
+    document.getElementById('encyclopediaSearchInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            searchEncyclopedia();
+        }
+    });
+
+    async function openDetailsModal(birdName) {
+        const modal = document.getElementById('detailsModal');
+        // 先设置一个加载状态的名称，后面获取到详情后再更新为完整名称
+        const titleEl = document.getElementById('modalBirdName');
+        titleEl.textContent = birdName;
+
+        const descEl = document.getElementById('modalDetailDescription');
+        const habitatEl = document.getElementById('modalDetailHabitat');
+        const dietEl = document.getElementById('modalDetailDiet');
+        const wikiLinkP = document.getElementById('modalDetailWikiLinkP');
+        const wikiLink = document.getElementById('modalDetailWikiLink');
+
+        descEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 加载中...';
+        habitatEl.textContent = '加载中...';
+        dietEl.textContent = '加载中...';
+        wikiLinkP.style.display = 'none';
+
+        modal.style.display = 'flex';
+
+        const details = await fetchBirdDetailsData(birdName);
+
+        if (details) {
+            // 使用后端返回的 full_name 更新标题
+            titleEl.textContent = details.full_name || birdName;
+
+            descEl.textContent = details.description || '暂无';
+            habitatEl.textContent = details.habitat || '暂无';
+            dietEl.textContent = details.diet || '暂无';
+            if (details.wiki_url) {
+                wikiLink.href = details.wiki_url;
+                wikiLinkP.style.display = 'block';
+            }
+        } else {
+            descEl.textContent = '暂无该鸟类的详细信息';
+            habitatEl.textContent = '暂无';
+            dietEl.textContent = '暂无';
+        }
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').style.display = 'none';
+    }
+
+
+    function createCardHtml(item) {
+        let ts = item.timestamp.replace(" ", "T");
+        if (!ts.includes("Z")) ts += "Z";
+        const localTime = new Date(ts).toLocaleString();
+        const imgSrc = item.image_path ? `${API_URL}${item.image_path}` : 'https://via.placeholder.com/200';
+        return `
+            <div class="gallery-card">
+                <img src="${imgSrc}" loading="lazy" onclick="openModal('${imgSrc}')" alt="${item.bird_name}">
+                <div class="gallery-card-info">
+                    <strong onclick="openDetailsModal('${item.bird_name}')" title="点击查看详情">${item.bird_name}</strong>
+                    <div class="meta"><i class="fas fa-check-circle" style="color: var(--accent-color);"></i> 准确率: ${item.similarity || '-'}%</div>
+                    <div class="meta"><i class="fas fa-location-dot"></i> ${item.location}</div>
+                    <div class="meta"><i class="far fa-clock"></i> ${localTime}</div>
+                    <div class="card-actions">
+                        <button class="btn" style="width: 100%; padding: 8px; font-size: 13px; background-color: #f8fafc; color: var(--primary-color); border: 1px solid #e2e8f0; border-radius: 6px;" onclick="openDetailsModal('${item.bird_name}')">
+                            <i class="fas fa-book-open"></i> 查看详细信息
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function searchHistory() {
+        currentHistoryPage = 1; // 重新搜索时，回到第一页
+        fetchHistory();
+    }
+
+    function changePage(delta) {
+        const newPage = currentHistoryPage + delta;
+        if (newPage >= 1 && newPage <= totalHistoryPages) {
+            currentHistoryPage = newPage;
+            fetchHistory();
+        }
+    }
+
+    async function fetchHistory() {
+        const query = document.getElementById('searchInput').value;
+        try {
+            const res = await fetch(`${API_URL}/history?query=${encodeURIComponent(query)}&page=${currentHistoryPage}&limit=8`);
+            const data = await res.json();
+            document.getElementById('historyList').innerHTML = data.history.map(i => createCardHtml(i)).join('');
+            
+            totalHistoryPages = data.total_pages;
+            currentHistoryPage = data.current_page;
+            
+            const paginationControls = document.getElementById('paginationControls');
+            if (totalHistoryPages > 0 && data.history.length > 0) {
+                paginationControls.style.display = 'flex';
+                document.getElementById('pageInfo').textContent = `第 ${currentHistoryPage} / ${totalHistoryPages} 页`;
+                document.getElementById('prevPageBtn').disabled = currentHistoryPage <= 1;
+                document.getElementById('nextPageBtn').disabled = currentHistoryPage >= totalHistoryPages;
+            } else {
+                paginationControls.style.display = 'none';
+                if (data.history.length === 0) {
+                    document.getElementById('historyList').innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #64748b; padding: 20px;">暂无相关记录</p>';
+                }
+            }
+        } catch(e) {}
+    }
+
+    async function fetchSameBirds(name) {
+        const res = await fetch(`${API_URL}/history/same_bird?bird_name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+        document.getElementById('sameBirdGallery').innerHTML = data.history.map(i => createCardHtml(i)).join('');
+    }
+
+    function autoLocate() {
+        const locInput = document.getElementById('locationInput');
+        locInput.placeholder = "正在获取位置...";
+        locInput.value = "";
+
+        if (typeof AMap === 'undefined') {
+            locInput.placeholder = "地图插件加载失败";
+            return;
+        }
+
+        AMap.plugin('AMap.Geolocation', function() {
+            const geolocation = new AMap.Geolocation({
+                enableHighAccuracy: true,
+                timeout: 10000,
+                needAddress: true,
+                extensions: 'base'
+            });
+
+            geolocation.getCurrentPosition(function(status, result) {
+                if (status === 'complete') {
+                    const addr = result.addressComponent;
+                    const province = addr.province || "";
+                    const city = addr.city || "";
+                    const displayAddr = (province === city) ? province : `${province}${city}`;
+                    locInput.value = displayAddr;
+                } else {
+                    locInput.placeholder = "定位失败，请手动输入";
+                }
+            });
+        });
+    }
+
+    function saveToMyHistory(data) {
+        let list = JSON.parse(localStorage.getItem('myBirdHistory') || '[]');
+        list.unshift({...data, timestamp: new Date().toISOString()});
+        localStorage.setItem('myBirdHistory', JSON.stringify(list.slice(0, 8)));
+        renderMyHistory();
+    }
+
+    function renderMyHistory() {
+        let list = JSON.parse(localStorage.getItem('myBirdHistory') || '[]');
+        if(list.length > 0) {
+            document.getElementById('myHistoryArea').style.display = 'block';
+            document.getElementById('myHistoryList').innerHTML = list.map(i => createCardHtml(i)).join('');
+        }
+    }
+
+    // Modal functions for Image
+    const modal = document.getElementById("myModal");
+    const modalImg = document.getElementById("img01");
+    let currentScale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let startX, startY;
+
+    function applyTransform() {
+        modalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+    }
+
+    function openModal(imgSrc) {
+        modal.style.display = "flex";
+        modalImg.src = imgSrc;
+        currentScale = 1;
+        translateX = 0;
+        translateY = 0;
+        applyTransform();
+        modalImg.addEventListener('wheel', handleWheelZoom, { passive: false });
+        modalImg.addEventListener('mousedown', handleMouseDown);
+    }
+
+    function closeModal() {
+        modal.style.display = "none";
+        modalImg.removeEventListener('wheel', handleWheelZoom);
+        modalImg.removeEventListener('mousedown', handleMouseDown);
+        modalImg.removeEventListener('mousemove', handleMouseMove);
+        modalImg.removeEventListener('mouseup', handleMouseUp);
+        modalImg.classList.remove('draggable');
+    }
+
+    function zoomIn() {
+        currentScale = Math.min(currentScale + 0.2, 5);
+        applyTransform();
+    }
+
+    function zoomOut() {
+        currentScale = Math.max(currentScale - 0.2, 0.5);
+        if (currentScale <= 1) {
+            translateX = 0;
+            translateY = 0;
+        }
+        applyTransform();
+    }
+
+    function handleWheelZoom(event) {
+        event.preventDefault();
+        const zoomAmount = event.deltaY < 0 ? 0.1 : -0.1;
+        let newScale = currentScale + zoomAmount;
+        newScale = Math.max(0.5, Math.min(newScale, 5));
+        currentScale = newScale;
+
+        if (currentScale <= 1) {
+            translateX = 0;
+            translateY = 0;
+        }
+        applyTransform();
+    }
+
+    function handleMouseDown(event) {
+        if (currentScale > 1) {
+            event.preventDefault();
+            isDragging = true;
+            modalImg.classList.add('draggable');
+            startX = event.clientX;
+            startY = event.clientY;
+
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+    }
+
+    function handleMouseMove(event) {
+        if (!isDragging) return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        translateX += dx;
+        translateY += dy;
+        startX = event.clientX;
+        startY = event.clientY;
+        applyTransform();
+    }
+
+    function handleMouseUp() {
+        isDragging = false;
+        modalImg.classList.remove('draggable');
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    // Close modals if clicking outside
+    window.onclick = function(event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+        const detailsModal = document.getElementById('detailsModal');
+        if (event.target === detailsModal) {
+            closeDetailsModal();
+        }
+    }
+
+    window.onload = () => { renderMyHistory(); autoLocate(); };
+</script>
+</body>
+</html>

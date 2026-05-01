@@ -1,0 +1,2 @@
+在bird环境里的终端执行
+uvicorn main:app --reload
